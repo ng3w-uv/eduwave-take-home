@@ -1,0 +1,20 @@
+### Wavy Tutor — executable API collection (VS Code REST Client / IntelliJ HTTP)
+@host = http://localhost:3000
+
+### Health
+GET {{host}}/health
+
+### (Phase 5) Create a session
+# POST {{host}}/api/sessions
+# Content-Type: application/json
+#
+# { "lang": "en" }
+
+### (Phase 5) Post a message
+# POST {{host}}/api/sessions/REPLACE_SESSION_ID/messages
+# Content-Type: application/json
+#
+# { "message": "How do I compare 2/5 and 1/2?" }
+
+### (Phase 5) Get a session transcript
+# GET {{host}}/api/sessions/REPLACE_SESSION_ID

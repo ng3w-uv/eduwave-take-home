@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+data/*.db
+data/*.db-*
+.env
+.env.local
+*.log
+.DS_Store
+
+# Confidential assignment brief — keep out of the repo (curriculum JSON is committed)
+Eduwave_AI_Intern_Final_Take_Home_Assignment.pdf
