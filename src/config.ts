@@ -15,6 +15,10 @@ const EnvSchema = z
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5-20251001"),
     DB_PATH: z.string().min(1).default("./data/eduwave.db"),
+    CURRICULUM_PATH: z
+      .string()
+      .min(1)
+      .default("./eduwave_fraction_curriculum.json"),
     LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   })
   .superRefine((env, ctx) => {
