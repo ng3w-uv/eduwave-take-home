@@ -6,6 +6,13 @@ import { makeDeps } from "./helpers.js";
 describe("GET /health", () => {
   const app = createApp(makeDeps().deps);
 
+  it("serves the web UI at /", async () => {
+    const res = await request(app).get("/");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/html/);
+    expect(res.text).toContain("Wavy Tutor");
+  });
+
   it("reports ok with the active provider", async () => {
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);

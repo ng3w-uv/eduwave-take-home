@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import express, {
   type Express,
   type NextFunction,
@@ -8,6 +9,9 @@ import express, {
 import { z } from "zod";
 import type { AppDeps } from "./deps.js";
 import { runTutorTurn } from "./tutor/pipeline.js";
+
+/** Minimal static web UI lives here (served at `/`). */
+const PUBLIC_DIR = fileURLToPath(new URL("../public", import.meta.url));
 
 /** The single controlled error shape. Every failure resolves to this — never a
  * stack trace (brief: "a useful, controlled error instead of a crash"). */
@@ -48,6 +52,10 @@ const asyncHandler =
 export function createApp(deps: AppDeps): Express {
   const app = express();
   app.use(express.json({ limit: "32kb" }));
+
+  // Minimal chat UI at `/` (serves public/index.html). Missing files fall
+  // through to the API routes / 404 handler below.
+  app.use(express.static(PUBLIC_DIR));
 
   app.get("/health", (_req, res) => {
     res.json({

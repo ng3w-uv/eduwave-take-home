@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wavy Tutor</title>
+    <style>
+      :root {
+        --bg: #0f172a; --panel: #1e293b; --muted: #94a3b8;
+        --user: #2563eb; --tutor: #334155; --accent: #14b8a6; --text: #e2e8f0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; font-family: -apple-system, system-ui, sans-serif;
+        background: var(--bg); color: var(--text); height: 100vh;
+        display: flex; flex-direction: column;
+      }
+      header {
+        padding: 14px 20px; border-bottom: 1px solid #334155;
+        display: flex; align-items: baseline; gap: 10px;
+      }
+      header h1 { font-size: 18px; margin: 0; }
+      header span { color: var(--muted); font-size: 13px; }
+      #status { margin-left: auto; font-size: 12px; color: var(--muted); }
+      #log {
+        flex: 1; overflow-y: auto; padding: 20px;
+        display: flex; flex-direction: column; gap: 14px; max-width: 760px;
+        width: 100%; margin: 0 auto;
+      }
+      .row { display: flex; }
+      .row.user { justify-content: flex-end; }
+      .bubble {
+        max-width: 78%; padding: 10px 14px; border-radius: 14px;
+        line-height: 1.45; white-space: pre-wrap; word-wrap: break-word;
+      }
+      .user .bubble { background: var(--user); }
+      .tutor .bubble { background: var(--tutor); }
+      .next { margin-top: 8px; color: var(--accent); font-weight: 600; }
+      .meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip {
+        font-size: 11px; padding: 2px 8px; border-radius: 999px;
+        background: #0b1220; color: var(--muted); border: 1px solid #334155;
+      }
+      .chip.flag { color: #fca5a5; border-color: #7f1d1d; }
+      .chip.cite { color: #a5b4fc; }
+      form {
+        display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #334155;
+        max-width: 760px; width: 100%; margin: 0 auto;
+      }
+      textarea {
+        flex: 1; resize: none; height: 46px; padding: 12px; border-radius: 10px;
+        border: 1px solid #334155; background: var(--panel); color: var(--text);
+        font: inherit;
+      }
+      button {
+        padding: 0 20px; border: 0; border-radius: 10px; background: var(--accent);
+        color: #04211d; font-weight: 700; cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🌊 Wavy Tutor</h1>
+      <span>Grade 5 fractions coach</span>
+      <span id="status">connecting…</span>
+    </header>
+    <div id="log"></div>
+    <form id="form">
+      <textarea id="input" placeholder="Ask a fractions question… e.g. How do I compare 2/5 and 1/2?" autofocus></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+
+    <script>
+      const log = document.getElementById("log");
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+      const send = document.getElementById("send");
+      const status = document.getElementById("status");
+      let sessionId = null;
+
+      function bubble(role, html) {
+        const row = document.createElement("div");
+        row.className = "row " + role;
+        const b = document.createElement("div");
+        b.className = "bubble";
+        b.innerHTML = html;
+        row.appendChild(b);
+        log.appendChild(row);
+        log.scrollTop = log.scrollHeight;
+        return b;
+      }
+
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+
+      function renderTutor(data) {
+        let html = esc(data.tutorMessage);
+        if (data.nextQuestion)
+          html += `<div class="next">${esc(data.nextQuestion)}</div>`;
+        const chips = [];
+        if (data.misconception && data.misconception !== "none")
+          chips.push(`<span class="chip">misconception: ${esc(data.misconception)}</span>`);
+        for (const c of data.curriculumCitations || [])
+          chips.push(`<span class="chip cite">${esc(c)}</span>`);
+        for (const f of data.safetyFlags || [])
+          chips.push(`<span class="chip flag">${esc(f)}</span>`);
+        if (typeof data.confidence === "number")
+          chips.push(`<span class="chip">confidence: ${data.confidence.toFixed(2)}</span>`);
+        if (chips.length)
+          html += `<div class="meta">${chips.join("")}</div>`;
+        return html;
+      }
+
+      async function init() {
+        try {
+          const res = await fetch("/api/sessions", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ lang: "en" }),
+          });
+          const data = await res.json();
+          sessionId = data.sessionId;
+          status.textContent = "session ready";
+        } catch (e) {
+          status.textContent = "could not reach server";
+        }
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const message = input.value.trim();
+        if (!message || !sessionId) return;
+        input.value = "";
+        bubble("user", esc(message));
+        send.disabled = true;
+        const thinking = bubble("tutor", "<em>thinking…</em>");
+        try {
+          const res = await fetch(`/api/sessions/${sessionId}/messages`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ message }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            thinking.innerHTML = `<em>Error: ${esc(data.error.message)}</em>`;
+          } else {
+            thinking.innerHTML = renderTutor(data);
+          }
+        } catch (err) {
+          thinking.innerHTML = "<em>Network error. Is the server running?</em>";
+        } finally {
+          send.disabled = false;
+          input.focus();
+        }
+      });
+
+      // Enter to send, Shift+Enter for newline.
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      init();
+    </script>
+  </body>
+</html>
