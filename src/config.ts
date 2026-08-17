@@ -11,7 +11,7 @@ const EnvSchema = z
     PORT: z.coerce.number().int().positive().default(3000),
     LLM_PROVIDER: z.enum(["ollama", "anthropic"]).default("ollama"),
     OLLAMA_HOST: z.string().url().default("http://localhost:11434"),
-    OLLAMA_MODEL: z.string().min(1).default("llama3.1:8b"),
+    OLLAMA_MODEL: z.string().min(1).default("qwen2.5:7b-instruct"),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5-20251001"),
     DB_PATH: z.string().min(1).default("./data/eduwave.db"),

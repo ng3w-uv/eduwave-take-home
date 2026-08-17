@@ -6,7 +6,7 @@ context, reasons over the conversation, and returns **age-appropriate Socratic
 feedback in a validated structure** — guiding toward understanding instead of
 handing over the answer.
 
-Built with **TypeScript + Express + SQLite**, running a **local `llama3.1:8b`
+Built with **TypeScript + Express + SQLite**, running a **local `qwen2.5:7b-instruct`
 model via Ollama** by default (no API key required), with Anthropic Claude
 available as a swappable provider.
 
@@ -23,7 +23,7 @@ available as a swappable provider.
 Prerequisites: Node ≥ 20 and [Ollama](https://ollama.com) running locally.
 
 ```bash
-ollama pull llama3.1:8b        # one-time; ~4.9 GB
+ollama pull qwen2.5:7b-instruct   # one-time; ~4.7 GB
 cp .env.example .env           # defaults to local Ollama — no secrets needed
 npm install
 npm run seed                   # optional: init SQLite + validate the curriculum
@@ -89,7 +89,7 @@ Client (requests.http / curl)
    ├─ Memory window .......... src/db/repositories   ──► SQLite (sessions/messages)
    ├─ Reveal gate ............ src/tutor/reveal.ts
    ├─ Prompt build ........... src/tutor/prompt.ts
-   ├─ LLMProvider  ◄── SEAM ... src/llm/  ───────────► Ollama llama3.1:8b (or Claude)
+   ├─ LLMProvider  ◄── SEAM ... src/llm/  ───────────► Ollama qwen2.5:7b-instruct (or Claude)
    ├─ Validate → repair ...... src/llm/structured + src/tutor/contract (Zod)
    ├─ Citation enforcement ... src/tutor/pipeline (finalize)
    └─ Persist + log .......... src/db/repositories   ──► SQLite (request_logs)
@@ -178,7 +178,7 @@ retrieval + validation + safety unchanged — only the generation budget shrinks
 
 ### 14. Biggest weakness in the current implementation
 
-**Tutoring quality depends on an 8B local model**, which adheres to the schema and
+**Tutoring quality depends on a 7B local model**, which adheres to the schema and
 Socratic constraints less reliably than a frontier model — so the repair loop and
 safety pre-checks carry real load, and subtle prompt-injection that dodges the
 regex pre-check leans entirely on the hardened prompt. The `LLMProvider` seam lets

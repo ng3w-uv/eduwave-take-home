@@ -10,7 +10,7 @@ line in a live review.
   implementation, test-writing, and iterating on the design. Also drove a
   structured design interview ("grilling") that produced the decision record in
   `docs/spec/0001-wavy-tutor.md` before any code was written.
-- **Ollama + `llama3.1:8b`** — the runtime tutor model (not a build tool), chosen
+- **Ollama + `qwen2.5:7b-instruct`** — the runtime tutor model (not a build tool), chosen
   so the project needs no API key and runs fully locally.
 
 ## Most important prompts / workflow
@@ -57,8 +57,8 @@ not log unnecessary student content."
 ## A decision I made differently from the AI's default
 
 For structured output, the reflexive AI approach is **tool-calling**. I chose
-**Ollama's JSON-schema-constrained decoding (`format`)** instead, because local
-7–8B models are unreliable at tool calls, whereas constrained decoding forces
+**Ollama's JSON-schema-constrained decoding (`format`)** instead, because small
+local models (7-8B) are unreliable at tool calls, whereas constrained decoding forces
 well-formed JSON. I derived the schema from Zod (single source of truth), kept the
 validate-then-repair loop regardless, and verified the real model returns
 schema-valid JSON via a live smoke test (~11s/call). Anthropic (which *is* good at
