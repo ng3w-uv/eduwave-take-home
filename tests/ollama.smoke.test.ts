@@ -7,7 +7,7 @@ import {
 } from "../src/tutor/contract.js";
 
 /**
- * Live integration check against a running Ollama + llama3.1:8b. Skipped by
+ * Live integration check against a running Ollama + qwen2.5:7b-instruct. Skipped by
  * default (non-deterministic, not for CI). Run with:
  *   RUN_OLLAMA_SMOKE=1 npm test
  */

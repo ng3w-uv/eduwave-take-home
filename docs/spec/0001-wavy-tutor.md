@@ -14,7 +14,7 @@ and reliable when the model provider misbehaves — none of which a raw chatbot 
 ## Solution
 
 **Wavy Tutor**: a small TypeScript/Express API backed by SQLite and a **local
-`llama3.1:8b` model served by Ollama**. A learner starts a session and posts
+`qwen2.5:7b-instruct` model served by Ollama**. A learner starts a session and posts
 messages. For each message the system retrieves the most relevant curriculum
 items by keyword score, assembles recent conversation context, and asks the model
 (via an abstracted `LLMProvider`) for **Socratic** guidance in a strict structured
@@ -56,7 +56,7 @@ of truth for the response contract.
 
 **LLM provider.** A `LLMProvider` interface — `generate(messages, jsonSchema) → object`
 — is the primary abstraction and the primary test seam. Default implementation targets
-**local Ollama `llama3.1:8b`**; an Anthropic Claude implementation is swappable via env
+**local Ollama `qwen2.5:7b-instruct`**; an Anthropic Claude implementation is swappable via env
 as the documented quality escape hatch. No API key is ever committed; missing config
 fails fast at boot with a clear message.
 

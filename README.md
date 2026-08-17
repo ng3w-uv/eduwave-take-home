@@ -88,6 +88,7 @@ Client (requests.http / curl)
    ├─ Retrieval (keyword) .... src/retrieval/       ──► Curriculum index (8 items)
    ├─ Memory window .......... src/db/repositories   ──► SQLite (sessions/messages)
    ├─ Reveal gate ............ src/tutor/reveal.ts
+   ├─ Math grounding ......... src/tutor/fractions.ts  (verified fraction facts)
    ├─ Prompt build ........... src/tutor/prompt.ts
    ├─ LLMProvider  ◄── SEAM ... src/llm/  ───────────► Ollama qwen2.5:7b-instruct (or Claude)
    ├─ Validate → repair ...... src/llm/structured + src/tutor/contract (Zod)
@@ -98,6 +99,14 @@ Client (requests.http / curl)
 The `LLMProvider` interface is the one meaningful test seam: injecting a fake
 provider makes the entire pipeline deterministic. Everything above the model
 call is pure; everything below is code-enforced.
+
+**Deterministic math grounding.** A small local model is unreliable at
+arithmetic, so `src/tutor/fractions.ts` parses the fractions from the current
+turn and computes the facts (smallest common denominator, equivalents, the
+plain-language comparison, and the ½-benchmark) **in code**, then passes them to
+the model as a verified "teacher note" it must not contradict. The tutor never
+depends on the model to do — or check — the math. This is the same grounding
+principle as curriculum citations, applied to arithmetic.
 
 ---
 
@@ -183,7 +192,9 @@ Socratic constraints less reliably than a frontier model — so the repair loop 
 safety pre-checks carry real load, and subtle prompt-injection that dodges the
 regex pre-check leans entirely on the hardened prompt. The `LLMProvider` seam lets
 us swap to Claude for quality, but the local default is the honest weak point.
-Secondary: keyword retrieval misses paraphrases (see Q8).
+Arithmetic errors specifically are mitigated by the deterministic math grounding
+(fraction facts computed in code), but general pedagogical phrasing still
+reflects the small model. Secondary: keyword retrieval misses paraphrases (see Q8).
 
 ---
 
@@ -192,12 +203,13 @@ Secondary: keyword retrieval misses paraphrases (see Q8).
 **Limitations:** local-model quality (Q14); keyword-only retrieval; safety
 pre-checks are regex heuristics (not exhaustive); rolling-summary memory is
 designed but not built; the Anthropic provider is implemented but not covered by
-an automated live test.
+an automated live test; the API accepts `lang: "es"` but the tutor currently
+responds in English (Spanish is not yet wired into the prompt).
 
 **Next three:**
 1. Add embeddings/hybrid retrieval to catch paraphrases.
 2. Implement rolling-summary memory for long conversations.
-3. Add streaming responses while preserving the validated structured metadata.
+3. Wire Spanish responses (the `lang` field is already plumbed through the API and DB).
 
 ## Tech choices
 

@@ -59,7 +59,7 @@ describe("Repositories (in-memory SQLite)", () => {
     repos.insertRequestLog({
       sessionId: s.id,
       provider: "ollama",
-      model: "llama3.1:8b",
+      model: "qwen2.5:7b-instruct",
       latencyMs: 1200,
       tokensIn: 400,
       tokensOut: 80,
