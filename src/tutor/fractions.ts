@@ -34,24 +34,6 @@ export function parseFractions(text: string): Frac[] {
   return out;
 }
 
-/** Gathers distinct fractions across the conversation (dedup by simplified value,
- * keeping earliest display form), capped to keep the note short. */
-function gather(texts: string[], cap = 3): Frac[] {
-  const seen = new Set<string>();
-  const result: Frac[] = [];
-  for (const text of texts) {
-    for (const f of parseFractions(text)) {
-      const k = key(f);
-      if (!seen.has(k)) {
-        seen.add(k);
-        result.push(f);
-        if (result.length >= cap) return result;
-      }
-    }
-  }
-  return result;
-}
-
 function benchmark(f: Frac): string {
   const v = f.n / f.d;
   if (v < 0.5) return "less than 1/2";
@@ -87,14 +69,6 @@ export function buildFractionFactsForTurn(
     }
   }
   return factsFor(picks.slice(0, 3));
-}
-
-/**
- * Builds the verified teacher note for whatever fractions appear in `texts`
- * (earliest first). Returns null when there's nothing numeric to ground.
- */
-export function buildFractionFacts(texts: string[]): string | null {
-  return factsFor(gather(texts));
 }
 
 function factsFor(fracs: Frac[], pairCap = 3): string | null {
