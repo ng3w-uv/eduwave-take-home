@@ -91,6 +91,87 @@ function finalize(
   };
 }
 
+/** Per-turn context shared by the orchestrator and its persistence step. */
+interface TurnContext {
+  repos: Repositories;
+  provider: LLMProvider;
+  sessionId: string;
+  startedAt: number;
+}
+
+/** Everything an exit path produces; `completeTurn` persists it and builds the result. */
+interface TurnOutcome {
+  response: TutorResponse;
+  retrievedIds: string[];
+  retrievalQuery: string;
+  revealAllowed: boolean;
+  repaired: boolean;
+  fallback: boolean;
+  blocked: boolean;
+  usage: Usage;
+  safetyFlags: SafetyFlag[];
+  error?: string;
+}
+
+/** Persists the assistant message (what the learner saw: message + follow-up
+ * question, so replayed history stays coherent) and a request-log row
+ * (metadata only — never the raw student content). */
+function persistTurn(
+  ctx: TurnContext,
+  o: TurnOutcome,
+  latencyMs: number,
+  estCostUsd: number,
+): void {
+  const transcript = o.response.nextQuestion
+    ? `${o.response.tutorMessage}\n\n${o.response.nextQuestion}`
+    : o.response.tutorMessage;
+  const assistantMsg = ctx.repos.insertMessage({
+    sessionId: ctx.sessionId,
+    role: "assistant",
+    content: transcript,
+    tutorJson: o.response,
+  });
+  ctx.repos.insertRequestLog({
+    sessionId: ctx.sessionId,
+    messageId: assistantMsg.id,
+    provider: ctx.provider.name,
+    model: ctx.provider.model,
+    latencyMs,
+    tokensIn: o.usage.tokensIn,
+    tokensOut: o.usage.tokensOut,
+    estCost: estCostUsd,
+    retrievedIds: o.retrievedIds,
+    safetyFlags: o.safetyFlags,
+    error: o.error ?? null,
+  });
+}
+
+/** Records the turn (persist + log) and assembles the TutorTurn result. Every
+ * exit path in `runTutorTurn` funnels through here. */
+function completeTurn(ctx: TurnContext, o: TurnOutcome): TutorTurn {
+  const latencyMs = Date.now() - ctx.startedAt;
+  const estCostUsd = estimateCostUsd(ctx.provider.model, o.usage);
+  persistTurn(ctx, o, latencyMs, estCostUsd);
+  return {
+    response: o.response,
+    meta: {
+      provider: ctx.provider.name,
+      model: ctx.provider.model,
+      retrievedIds: o.retrievedIds,
+      retrievalQuery: o.retrievalQuery,
+      revealAllowed: o.revealAllowed,
+      repaired: o.repaired,
+      fallback: o.fallback,
+      blocked: o.blocked,
+      latencyMs,
+      usage: o.usage,
+      estCostUsd,
+      safetyFlags: o.safetyFlags,
+      error: o.error,
+    },
+  };
+}
+
 /**
  * Runs one tutoring turn end to end: persist input, safety pre-check, retrieval
  * (with prior-topic reuse on low-signal follow-ups), reveal gate, prompt build,
@@ -103,7 +184,12 @@ export async function runTutorTurn(
 ): Promise<TutorTurn> {
   const { repos, curriculum, provider } = deps;
   const window = deps.memoryWindow ?? DEFAULT_WINDOW;
-  const start = Date.now();
+  const ctx: TurnContext = {
+    repos,
+    provider,
+    sessionId: input.sessionId,
+    startedAt: Date.now(),
+  };
 
   const userMsg = repos.insertMessage({
     sessionId: input.sessionId,
@@ -113,70 +199,10 @@ export async function runTutorTurn(
   const recent = repos.getRecentMessages(input.sessionId, window + 1);
   const priorMessages = recent.filter((m) => m.id !== userMsg.id);
 
-  // Persist the assistant turn + a request log, then assemble the result.
-  const finish = (args: {
-    response: TutorResponse;
-    retrievedIds: string[];
-    retrievalQuery: string;
-    revealAllowed: boolean;
-    repaired: boolean;
-    fallback: boolean;
-    blocked: boolean;
-    usage: Usage;
-    safetyFlags: SafetyFlag[];
-    error?: string;
-  }): TutorTurn => {
-    const latencyMs = Date.now() - start;
-    const estCostUsd = estimateCostUsd(provider.model, args.usage);
-    // Persist what the learner actually saw — the message AND the follow-up
-    // question — so replayed history stays coherent and the tutor doesn't
-    // re-ask a question the learner already answered.
-    const transcript = args.response.nextQuestion
-      ? `${args.response.tutorMessage}\n\n${args.response.nextQuestion}`
-      : args.response.tutorMessage;
-    const assistantMsg = repos.insertMessage({
-      sessionId: input.sessionId,
-      role: "assistant",
-      content: transcript,
-      tutorJson: args.response,
-    });
-    repos.insertRequestLog({
-      sessionId: input.sessionId,
-      messageId: assistantMsg.id,
-      provider: provider.name,
-      model: provider.model,
-      latencyMs,
-      tokensIn: args.usage.tokensIn,
-      tokensOut: args.usage.tokensOut,
-      estCost: estCostUsd,
-      retrievedIds: args.retrievedIds,
-      safetyFlags: args.safetyFlags,
-      error: args.error ?? null,
-    });
-    return {
-      response: args.response,
-      meta: {
-        provider: provider.name,
-        model: provider.model,
-        retrievedIds: args.retrievedIds,
-        retrievalQuery: args.retrievalQuery,
-        revealAllowed: args.revealAllowed,
-        repaired: args.repaired,
-        fallback: args.fallback,
-        blocked: args.blocked,
-        latencyMs,
-        usage: args.usage,
-        estCostUsd,
-        safetyFlags: args.safetyFlags,
-        error: args.error,
-      },
-    };
-  };
-
   // 1. Safety pre-check — short-circuit obvious violations; model never sees them.
   const safety = precheckSafety(input.message);
   if (safety.block) {
-    return finish({
+    return completeTurn(ctx, {
       response: safetyRedirect(safety.flags),
       retrievedIds: [],
       retrievalQuery: input.message,
@@ -219,6 +245,13 @@ export async function runTutorTurn(
   });
 
   // 5. Structured generation (validate -> repair -> fallback).
+  const base = {
+    retrievedIds,
+    retrievalQuery,
+    revealAllowed: reveal.revealAllowed,
+    blocked: false,
+  };
+
   let structured;
   try {
     structured = await generateStructured(
@@ -229,14 +262,11 @@ export async function runTutorTurn(
     );
   } catch (err) {
     const code = err instanceof LlmError ? err.code : "provider_error";
-    return finish({
+    return completeTurn(ctx, {
+      ...base,
       response: fallbackResponse(safety.flags),
-      retrievedIds,
-      retrievalQuery,
-      revealAllowed: reveal.revealAllowed,
       repaired: false,
       fallback: true,
-      blocked: false,
       usage: NO_USAGE,
       safetyFlags: safety.flags,
       error: code,
@@ -244,14 +274,11 @@ export async function runTutorTurn(
   }
 
   if (!structured.ok) {
-    return finish({
+    return completeTurn(ctx, {
+      ...base,
       response: fallbackResponse(safety.flags),
-      retrievedIds,
-      retrievalQuery,
-      revealAllowed: reveal.revealAllowed,
       repaired: false,
       fallback: true,
-      blocked: false,
       usage: structured.usage,
       safetyFlags: safety.flags,
       error: "invalid_output",
@@ -260,14 +287,11 @@ export async function runTutorTurn(
 
   // 6. Enforce grounding + finalize.
   const response = finalize(structured.data, retrievedIds, safety.flags);
-  return finish({
+  return completeTurn(ctx, {
+    ...base,
     response,
-    retrievedIds,
-    retrievalQuery,
-    revealAllowed: reveal.revealAllowed,
     repaired: structured.repaired,
     fallback: false,
-    blocked: false,
     usage: structured.usage,
     safetyFlags: response.safetyFlags,
   });

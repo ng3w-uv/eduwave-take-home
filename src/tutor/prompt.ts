@@ -1,3 +1,4 @@
+import { MISCONCEPTION_GUIDE } from "../curriculum/misconceptions.js";
 import type { Message } from "../db/repositories.js";
 import type { LlmMessage } from "../llm/types.js";
 import type { RetrievalResult } from "../retrieval/index.js";
@@ -66,6 +67,12 @@ export function buildPrompt(args: BuildPromptArgs): LlmMessage[] {
 
   const messages: LlmMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "system",
+      content:
+        `MISCONCEPTION VOCABULARY — set "misconception" to the single best-fitting ` +
+        `code below, or "none" if none clearly applies:\n${MISCONCEPTION_GUIDE}`,
+    },
     { role: "system", content: context },
   ];
 

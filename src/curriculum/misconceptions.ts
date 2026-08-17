@@ -66,3 +66,11 @@ export type MisconceptionCode = keyof typeof MISCONCEPTIONS;
 export const MISCONCEPTION_CODES = Object.keys(
   MISCONCEPTIONS,
 ) as [MisconceptionCode, ...MisconceptionCode[]];
+
+/** `code: description` lines fed to the model so it tags the right misconception
+ * instead of guessing what each slug means. */
+export const MISCONCEPTION_GUIDE = (
+  Object.entries(MISCONCEPTIONS) as [MisconceptionCode, { description: string }][]
+)
+  .map(([code, { description }]) => `- ${code}: ${description}`)
+  .join("\n");
