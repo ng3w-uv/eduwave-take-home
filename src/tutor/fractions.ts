@@ -59,12 +59,45 @@ function benchmark(f: Frac): string {
   return "equal to 1/2";
 }
 
+function hasFrac(list: Frac[], f: Frac): boolean {
+  return list.some((x) => key(x) === key(f));
+}
+
+/**
+ * Selects the fractions the current turn is actually about: those in the latest
+ * student message, topped up (if fewer than two) from the most-recent prior
+ * turns. This keeps the notes focused on the active comparison instead of
+ * dragging in stale fractions from earlier in the conversation.
+ */
+export function buildFractionFactsForTurn(
+  currentMessage: string,
+  priorTextsRecentFirst: string[],
+): string | null {
+  const picks: Frac[] = [];
+  for (const f of parseFractions(currentMessage)) {
+    if (!hasFrac(picks, f)) picks.push(f);
+  }
+  if (picks.length < 2) {
+    for (const text of priorTextsRecentFirst) {
+      for (const f of parseFractions(text)) {
+        if (!hasFrac(picks, f)) picks.push(f);
+        if (picks.length >= 2) break;
+      }
+      if (picks.length >= 2) break;
+    }
+  }
+  return factsFor(picks.slice(0, 3));
+}
+
 /**
  * Builds the verified teacher note for whatever fractions appear in `texts`
  * (earliest first). Returns null when there's nothing numeric to ground.
  */
-export function buildFractionFacts(texts: string[], pairCap = 3): string | null {
-  const fracs = gather(texts);
+export function buildFractionFacts(texts: string[]): string | null {
+  return factsFor(gather(texts));
+}
+
+function factsFor(fracs: Frac[], pairCap = 3): string | null {
   if (fracs.length === 0) return null;
 
   const lines: string[] = [];
@@ -87,11 +120,24 @@ export function buildFractionFacts(texts: string[], pairCap = 3): string | null 
       const L = lcm(a.d, b.d);
       const ae = a.n * (L / a.d);
       const be = b.n * (L / b.d);
-      const rel = ae > be ? ">" : ae < be ? "<" : "=";
+      const af = `${a.n}/${a.d}`;
+      const bf = `${b.n}/${b.d}`;
+
+      // State the winner in plain language so the model never has to derive it.
+      const verdict =
+        ae === be
+          ? `${af} and ${bf} are equal`
+          : `the greater fraction is ${ae > be ? af : bf}`;
+      const cmp =
+        ae > be
+          ? `${af} > ${bf} (equivalently ${bf} < ${af})`
+          : ae < be
+            ? `${bf} > ${af} (equivalently ${af} < ${bf})`
+            : `${af} = ${bf}`;
+
       lines.push(
-        `For ${a.n}/${a.d} and ${b.n}/${b.d}: smallest common denominator is ${L} ` +
-          `(also ${2 * L}, ${3 * L}); rewritten as ${ae}/${L} and ${be}/${L}; ` +
-          `so ${a.n}/${a.d} ${rel} ${b.n}/${b.d}.`,
+        `For ${af} and ${bf}: ${verdict}. Smallest common denominator is ${L}; ` +
+          `rewritten, ${af} = ${ae}/${L} and ${bf} = ${be}/${L}; so ${cmp}.`,
       );
       pairs++;
     }

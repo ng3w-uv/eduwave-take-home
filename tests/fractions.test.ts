@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildFractionFacts, parseFractions } from "../src/tutor/fractions.js";
+import {
+  buildFractionFacts,
+  buildFractionFactsForTurn,
+  parseFractions,
+} from "../src/tutor/fractions.js";
 
 describe("parseFractions", () => {
   it("extracts a/b fractions and ignores non-fractions", () => {
@@ -20,8 +24,10 @@ describe("buildFractionFacts", () => {
 
   it("computes the correct smallest common denominator and comparison", () => {
     const notes = buildFractionFacts(["How do I compare 2/5 and 1/2?"])!;
-    expect(notes).toContain("smallest common denominator is 10");
-    expect(notes).toContain("4/10 and 5/10");
+    expect(notes).toContain("common denominator is 10");
+    expect(notes).toContain("2/5 = 4/10");
+    expect(notes).toContain("1/2 = 5/10");
+    expect(notes).toContain("the greater fraction is 1/2");
     expect(notes).toContain("2/5 < 1/2"); // 0.4 < 0.5
   });
 
@@ -36,5 +42,27 @@ describe("buildFractionFacts", () => {
     // 5/10 and 4/10 are equivalents of 1/2 and 2/5, so no new fractions appear
     expect(notes).toContain("Fractions in play: 1/2, 2/5");
     expect(notes).not.toContain("5/10 =");
+  });
+});
+
+describe("buildFractionFactsForTurn (scoped to the active comparison)", () => {
+  it("uses the fractions in the current message, ignoring stale earlier pairs", () => {
+    const notes = buildFractionFactsForTurn("Is 1/2 greater than 2/5?", [
+      "earlier we compared 5/6 and 1/2",
+      "and before that 3/4 and 1/2",
+    ])!;
+    expect(notes).toContain("Fractions in play: 1/2, 2/5");
+    expect(notes).not.toContain("5/6");
+    expect(notes).not.toContain("3/4");
+    expect(notes).toContain("1/2 > 2/5"); // 0.5 > 0.4
+  });
+
+  it("falls back to the most-recent prior pair when the message has no fractions", () => {
+    const notes = buildFractionFactsForTurn("10", [
+      "How do I compare 2/5 and 1/2?",
+    ])!;
+    expect(notes).toContain("common denominator is 10");
+    expect(notes).toContain("2/5");
+    expect(notes).toContain("1/2");
   });
 });

@@ -10,7 +10,7 @@ import {
   type SafetyFlag,
   type TutorResponse,
 } from "./contract.js";
-import { buildFractionFacts } from "./fractions.js";
+import { buildFractionFactsForTurn } from "./fractions.js";
 import { buildPrompt } from "./prompt.js";
 import { computeReveal } from "./reveal.js";
 import { fallbackResponse, safetyRedirect } from "./responses.js";
@@ -206,10 +206,10 @@ export async function runTutorTurn(
 
   // 4. Prompt — with deterministically computed fraction facts so the model
   // never has to (mis)do the arithmetic itself.
-  const mathNotes = buildFractionFacts([
-    ...priorMessages.map((m) => m.content),
+  const mathNotes = buildFractionFactsForTurn(
     input.message,
-  ]);
+    [...priorMessages].reverse().map((m) => m.content),
+  );
   const messages = buildPrompt({
     priorMessages,
     retrieval,

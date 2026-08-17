@@ -44,7 +44,8 @@ export class OllamaProvider implements LLMProvider {
           messages,
           stream: false,
           format: jsonSchema,
-          options: { temperature: 0.3 },
+          // temperature 0 for consistent, non-"creative" tutoring on a small model
+          options: { temperature: 0 },
         }),
         signal: controller.signal,
       });
