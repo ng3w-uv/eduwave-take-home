@@ -10,6 +10,7 @@ import {
   type SafetyFlag,
   type TutorResponse,
 } from "./contract.js";
+import { buildFractionFacts } from "./fractions.js";
 import { buildPrompt } from "./prompt.js";
 import { computeReveal } from "./reveal.js";
 import { fallbackResponse, safetyRedirect } from "./responses.js";
@@ -203,12 +204,18 @@ export async function runTutorTurn(
   // 3. Reveal gate.
   const reveal = computeReveal(priorMessages, input.message);
 
-  // 4. Prompt.
+  // 4. Prompt — with deterministically computed fraction facts so the model
+  // never has to (mis)do the arithmetic itself.
+  const mathNotes = buildFractionFacts([
+    ...priorMessages.map((m) => m.content),
+    input.message,
+  ]);
   const messages = buildPrompt({
     priorMessages,
     retrieval,
     currentMessage: input.message,
     revealAllowed: reveal.revealAllowed,
+    mathNotes,
   });
 
   // 5. Structured generation (validate -> repair -> fallback).
