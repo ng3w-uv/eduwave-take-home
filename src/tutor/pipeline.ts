@@ -127,10 +127,16 @@ export async function runTutorTurn(
   }): TutorTurn => {
     const latencyMs = Date.now() - start;
     const estCostUsd = estimateCostUsd(provider.model, args.usage);
+    // Persist what the learner actually saw — the message AND the follow-up
+    // question — so replayed history stays coherent and the tutor doesn't
+    // re-ask a question the learner already answered.
+    const transcript = args.response.nextQuestion
+      ? `${args.response.tutorMessage}\n\n${args.response.nextQuestion}`
+      : args.response.tutorMessage;
     const assistantMsg = repos.insertMessage({
       sessionId: input.sessionId,
       role: "assistant",
-      content: args.response.tutorMessage,
+      content: transcript,
       tutorJson: args.response,
     });
     repos.insertRequestLog({

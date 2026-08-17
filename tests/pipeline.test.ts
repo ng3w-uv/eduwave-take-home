@@ -105,6 +105,20 @@ describe("runTutorTurn", () => {
     expect(sentRoles.filter((r) => r === "assistant").length).toBeGreaterThan(0);
   });
 
+  it("replays the prior nextQuestion in history so the tutor doesn't re-ask", async () => {
+    const provider = new FakeProvider({ responses: [validModelOutput] });
+    const d: TutorDeps = { repos, curriculum, provider };
+    const s = repos.createSession();
+
+    await runTutorTurn(d, { sessionId: s.id, message: "How do I compare 2/5 and 1/2?" });
+    await runTutorTurn(d, { sessionId: s.id, message: "10" });
+
+    const assistantTurns = provider.lastParams!.messages.filter((m) => m.role === "assistant");
+    expect(
+      assistantTurns.some((m) => m.content.includes(validModelOutput.nextQuestion)),
+    ).toBe(true);
+  });
+
   it("resists prompt injection without calling the model", async () => {
     const provider = new FakeProvider({ responses: [validModelOutput] });
     const d: TutorDeps = { repos, curriculum, provider };
